@@ -1,0 +1,2 @@
+
+Librerie: Streamlit, Polars, Geopandas
