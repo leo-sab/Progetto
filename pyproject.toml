@@ -8,5 +8,6 @@ dependencies = [
     "altair>=5.5.0",
     "geopandas>=1.0.1",
     "polars>=1.27.1",
+    "scipy>=1.15.2",
     "streamlit>=1.44.1",
 ]

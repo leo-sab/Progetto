@@ -2,21 +2,16 @@ import streamlit as st
 import polars as pl
 import altair as alt
 from preprocess import *
-
+from scipy.stats import chi2_contingency
 # global variables
 cat_color = "category20" 
+sequential_color = "viridis"
 
 # Load data
 data = get_data()
 world = get_mapdata()
 joined = get_mapdata(data)
 
-# functions
-def add_map(chart):
-    """Salva la mappa come file html e la carica in streamlit"""
-    chart.save("map.html")
-    with open("map.html") as fp:
-        st.components.v1.html(fp.read(), width=600, height=600)
 
 #### MAIN CODE ####
 st.set_page_config(page_title="Hotel Bookings", page_icon="🏨", layout="centered")
@@ -103,138 +98,18 @@ Proveremo in seguito ad indagare più a fondo.
 Concentriamoci ora sulla variabile 'adr' (Average Daily Rate), 
 che rappresenta il prezzo medio per notte.
 """
-############################################################
-# Calcoliamo le mediane utilizzando solo Polars
-median_adr_hotel = data.group_by("hotel").agg(
-    pl.col("adr").median().alias("median_adr")
-)
+chart = alt.Chart(data).mark_boxplot().encode(
+    alt.X('adr:Q', title='Prezzo medio per notte (€)'),
+    alt.Facet("hotel:N", title = ""),
+    alt.Color("hotel:N", title="Tipo di hotel")
 
-# Prepariamo i dati per l'istogramma speculare
-# Creiamo un dataframe per l'istogramma con bin predefiniti
-hist_data = data.select(
-    pl.col("hotel"),
-    pl.col("adr")
-)
+).properties(
+    title="Distribuzione del prezzo medio per notte per tipo di hotel")
 
-# Definiamo i colori per ciascun hotel
-hotel_colors = {
-    "City Hotel": "#1f77b4",  # Blu
-    "Resort Hotel": "#aec7e8"  # Azzurro
-}
-
-# Creiamo l'istogramma speculare
-hist = alt.Chart(hist_data.to_pandas()).transform_bin(
-    "adr_bin",
-    "adr",
-    bin={"maxbins": 60}
-).transform_aggregate(
-    count="count()",
-    groupby=["adr_bin", "hotel"]
-).transform_calculate(
-    # Usiamo ancora i valori negativi per Resort Hotel, ma aggiungiamo un valore assoluto per il tooltip
-    count_signed="datum.hotel == 'City Hotel' ? datum.count : -datum.count",
-    count_abs="Math.abs(datum.count)"
-).mark_bar().encode(
-    x=alt.X("adr_bin:Q", title="Prezzo medio per notte (€)", axis=alt.Axis(format=",.0f")),
-    y=alt.Y("count_signed:Q", title="Frequenza", 
-           # Formattiamo l'asse y per mostrare i valori assoluti invece di negativi
-           axis=alt.Axis(format="|~s", labelExpr="Math.abs(datum.value)")),
-    color=alt.Color("hotel:N", scale=alt.Scale(domain=list(hotel_colors.keys()), range=list(hotel_colors.values()))),
-    tooltip=[
-        alt.Tooltip("hotel:N", title="Tipo Hotel"),
-        alt.Tooltip("adr_bin:Q", title="Prezzo", format=",.0f"),
-        alt.Tooltip("count_abs:Q", title="Frequenza", format=",")
-    ]
-)
-
-# Aggiungiamo etichette agli assi per chiarire quale hotel è sopra e quale sotto
-top_label = alt.Chart({"values": [{"text": "City Hotel"}]}).mark_text(
-    align="left",
-    baseline="top",
-    fontSize=12,
-    dy=-180
-).encode(
-    x=alt.value(0),
-    y=alt.value(0),
-    text="text:N"
-)
-
-bottom_label = alt.Chart({"values": [{"text": "Resort Hotel"}]}).mark_text(
-    align="left",
-    baseline="bottom",
-    fontSize=12,
-    dy=180
-).encode(
-    x=alt.value(0),
-    y=alt.value(0),
-    text="text:N"
-)
-
-# Linee delle mediane per City Hotel
-city_median_line = alt.Chart(
-    median_adr_hotel.filter(pl.col("hotel") == "City Hotel")
-).mark_rule(
-    strokeDash=[4, 2],
-    color="red",
-    size=2
-).encode(
-    x="median_adr:Q",
-    tooltip=alt.Tooltip("median_adr:Q", title="Mediana City Hotel", format=",.2f")
-)
-
-# Aggiunta testo per la mediana City Hotel
-city_median_text = alt.Chart(
-    median_adr_hotel.filter(pl.col("hotel") == "City Hotel")
-).mark_text(
-    align="left",
-    baseline="middle",
-    dx=5,
-    dy=-40,
-    fontSize=12,
-    fontWeight="bold",
-    color="red"
-).encode(
-    x="median_adr:Q",
-    text=alt.Text("median_adr:Q", format=",.2f €")
-)
-
-# Linee delle mediane per Resort Hotel
-resort_median_line = alt.Chart(
-    median_adr_hotel.filter(pl.col("hotel") == "Resort Hotel")
-).mark_rule(
-    strokeDash=[4, 2],
-    color="darkred",
-    size=2
-).encode(
-    x="median_adr:Q",
-    tooltip=alt.Tooltip("median_adr:Q", title="Mediana Resort Hotel", format=",.2f")
-)
-
-# Aggiunta testo per la mediana Resort Hotel
-resort_median_text = alt.Chart(
-    median_adr_hotel.filter(pl.col("hotel") == "Resort Hotel")
-).mark_text(
-    align="left",
-    baseline="middle",
-    dx=5,
-    dy=40,
-    fontSize=12,
-    fontWeight="bold",
-    color="darkred"
-).encode(
-    x="median_adr:Q",
-    text=alt.Text("median_adr:Q", format=",.2f €")
-)
-
-# Combiniamo tutto in un grafico finale
-final_chart = (
-    hist 
-)
-
-# Visualizziamo il grafico
-st.altair_chart(final_chart, use_container_width=True)
+st.altair_chart(chart, use_container_width=True)
 """
-Vediamo che il prezzo degli hotel di città hanno un prezzo mediano più a
+Vediamo che il prezzo degli hotel di città hanno un prezzo mediano più a ...
+
 """
 
 # prepare data for chart
@@ -256,11 +131,16 @@ chart = alt.Chart(bin).mark_circle(size=100).encode(
     alt.Size("count:Q", title="Numero Prenotazioni"),
     alt.Color("hotel:N", title="Tipo di hotel",
             scale=alt.Scale(scheme=cat_color)),
-    tooltip=["hotel:N","adr_bin:N","cancellation_rate:Q"]
+    tooltip=["hotel:N","adr_bin:N","cancellation_rate:Q","count:Q"]
 ).properties(title="Tasso di cancellazione per hotel e prezzo medio per notte (diviso in 5 intervalli)")
 st.altair_chart(chart, use_container_width=True)
 """
-si
+Il grafico rappresenta la variazione del tasso di cancellazione per fascie di prezzo (sono stati utilizzati i quantili 0.2,0.4,0.6,0.8 di adr) 
+dei 2 tipi di hotel, utilizzando la grandezza del cerchio per mostrare quante prenotazioni ci sono in ogni fascia.
+
+Notiamo che il tasso di cancellazione dei 2 tipi di hotel per la fascia di prezzo più bassa ha un comportamento opposto: 
+i resort hanno il tasso più basso mentre i city hotel il più alto. 
+Aumentando il prezzo quello dei resort tende a
 """
 chart = alt.Chart(data).mark_line(opacity = 0.4).encode(
     alt.X("arrival_date:T", title="Data di arrivo"),
@@ -327,7 +207,7 @@ a ridosso della data di arrivo.
 
 
 
-if st.selectbox("Seleziona mondo o europa", [ "Europa","Mondo"]) == "Europa":
+if  st.selectbox("Vuoi visualizzare la distribuzione delle prenotazioni in tutto il mondo o solo in Europa", [ "Europa","Mondo"]) == "Europa":
     map_type = "azimuthalEqualArea"
     center = (10, 48)
     scale = 800
@@ -348,7 +228,7 @@ chart = alt.Chart(world).mark_geoshape(color= "lightgray").properties(width=600,
 )
 
 mappa = alt.Chart(joined).mark_geoshape().encode(
-    color=alt.Color("count:Q", scale=alt.Scale(scheme="plasma", domain = [0,maxdomain]),legend=alt.Legend(title="Prenotazioni", orient="top-left")),
+    color=alt.Color("count:Q", scale=alt.Scale(scheme=sequential_color, domain = [0,maxdomain]),legend=alt.Legend(title="Prenotazioni", orient="top-left")),
     tooltip=["country:N", "count:Q"]
 ).project(
     type= map_type,
@@ -363,5 +243,86 @@ add_map(chart + mappa)
 """
 La mappa mostra la distribuzione delle prenotazioni in tutto il mondo,
 vediamo che la maggior parte delle prenotazioni proviene da paesi europei, in particolare dal Portogallo (puoi visualizzare le prenotazioni su una scala 
-che va da 0 alla seconda più numerosa spuntando la tick su escludi Portogallo).
+che va da 0 alla seconda più numerosa spuntando la casella "Escludendo il Portogallo").
 """
+if st.selectbox("Seleziona mondo o europa", [ "Europa","Mondo"]) == "Europa":
+    map_type = "azimuthalEqualArea"
+    center = (10, 48)
+    scale = 800
+else:
+    map_type = "equalEarth" 
+    center = (0, 0)
+    scale = 150 
+base = alt.Chart(world).mark_geoshape(color="lightgray").properties(width=600, height=600).project(
+    type=map_type,
+    scale=scale,
+    center=center
+)
+
+mappa = alt.Chart(joined).mark_geoshape().encode(
+    color=alt.Color("rate_cancelled:Q", scale=alt.Scale(scheme=sequential_color),
+                legend=alt.Legend(title="Tasso di Cancellazione", format=".2%",orient="top-left")),
+    tooltip=["country:N", alt.Tooltip("rate_cancelled:Q", format=".2%"), "count:Q"]
+).project(
+    type=map_type,
+    scale=scale,
+    center=center
+).properties(
+    width=600,
+    height=600,
+    title="Tasso di Cancellazione"
+)
+
+if st.checkbox("Vuoi un grafico che includa anche la numerosità delle prenotazioni (in scala logaritmica) per una migliore visualizzazione? ", [False, True]) == True:
+    mappa = mappa.encode(opacity=alt.Opacity('count:Q', scale=alt.Scale(type = "log",range=[0,1]),
+                 legend=alt.Legend(title="Numero Prenotazioni",orient="top-left", format=".0f")))
+
+add_map(base + mappa)
+
+"""
+L'analisi del grafico rivela che il Portogallo presenta uno dei tassi di cancellazione più elevati tra i Paesi visualizzati, 
+suggerendo una potenziale correlazione tra la localizzazione degli hotel e la frequenza di cancellazione. 
+Un'ipotesi plausibile è che la vicinanza geografica possa incentivare una maggiore propensione alla cancellazione da parte
+ dei clienti che prenotano in Portogallo. 
+ La ridotta incidenza di costi o complicazioni logistiche associate alla cancellazione per i clienti locali potrebbe contribuire a questo fenomeno.
+
+Questa osservazione potrebbe fornire spunti per interpretare le differenze nei tassi di cancellazione riscontrate negli hotel di 
+città appartenenti a fasce di prezzo inferiori. Se una porzione considerevole della clientela di tali strutture è costituita da residenti portoghesi, 
+la loro ipotizzata maggiore tendenza alla cancellazione potrebbe essere un fattore determinante nel tasso complessivo di cancellazione per questa categoria di hotel.
+
+Parallelamente, si potrebbe ipotizzare un effetto di auto-selezione di tipo economico tra i clienti internazionali che viaggiano in Portogallo.
+I viaggiatori stranieri, affrontando costi e impegni maggiori legati al viaggio, potrebbero dimostrare una minore propensione alla cancellazione, 
+specialmente se orientati verso hotel di fascia di prezzo più alta. Questa dinamica suggerisce una potenziale relazione tra la nazionalità del cliente, 
+la fascia di prezzo dell'hotel e la probabilità di cancellazione, meritevole di ulteriori indagini.
+
+Tabella hotel di città con adr <= 65:
+"""
+temp = data.filter((pl.col("adr")<=65) & (pl.col("hotel") == "City Hotel")).with_columns(
+    pl.when(pl.col("country") == "PRT").then(pl.lit("Portogallo")).otherwise(pl.lit("Altri Paesi")).alias("country")
+).group_by("country").agg(
+    pl.count().alias("numero di prenotazioni"), pl.col("is_canceled").cast(pl.Float64).mean().alias("tasso di cancellazione"))
+st.write( temp )
+"""
+Tabella restanti prenotazioni:"""
+temp1 = data.filter((pl.col("adr")>65) | (pl.col("hotel") != "City Hotel")).with_columns(
+    pl.when(pl.col("country") == "PRT").then(pl.lit("Portogallo")).otherwise(pl.lit("Altri Paesi")).alias("country")
+).group_by("country").agg(
+    pl.count().alias("numero di prenotazioni"),pl.col("is_canceled").mean().alias("tasso di cancellazione"))
+st.write( temp1 )
+
+observed = pl.concat([temp,temp1]).select(pl.col("numero di prenotazioni")).to_numpy().reshape(2,2)
+
+chi ,p  = chi2(observed)
+"""
+Già senza ulteriori analisi si osserva che i 2 gruppi sono molto disomigenei, però volendo verificare ciò in maniera più rigorosa
+possiamo utilizzare un test statistico per verificare l'assunzione di indipendenza (chi-quadro):
+"""
+st.write(f"La statistica test è pari a {chi}",f" con un P-value di {p}")
+""" 
+Quindi abbiamo un ulteriore indizio a favore dell'ipotesi fatta in precedenza.
+"""
+
+#book changes 
+#special requests
+# deposit type
+
