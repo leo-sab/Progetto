@@ -1,5 +1,5 @@
 
-Librerie: Streamlit, Polars, Geopandas, Altair
+Librerie: Streamlit, Polars, Geopandas, Altair, Scipy
 
 Spiegazione dataset e variabili:
 

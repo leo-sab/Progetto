@@ -1,6 +1,7 @@
 import polars as pl
 import geopandas as gpd
 import streamlit as st
+import altair as alt
 
 @st.cache_data
 def get_data(preprocess = True) -> pl.DataFrame:
@@ -104,4 +105,20 @@ def chi2(observed):
     chi2, pvalue, df, exp =  chi2_contingency(observed)
     return round(chi2,2), pvalue
 
-
+def bar_chart(data, x, y, color = None, palette = None):
+    """
+    Create an Altair bar chart
+    data:    Polars DataFrame
+    x:       Categorical column 
+    y:       Numerical column 
+    color:   Categorical column for coloring bars; if None, returns a simple bar chart
+    palette: Altair color scheme for the 'color' column
+    """
+    chart = alt.Chart(data).mark_bar().encode(
+        alt.X(x+":N", title=x),
+        alt.Y(y, title=y))
+    if color is None:
+        return chart
+    else:
+        return chart.encode(alt.Color(color+":N", title=color,
+            scale=alt.Scale(scheme=palette)))

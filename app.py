@@ -6,6 +6,7 @@ from scipy.stats import chi2_contingency
 # global variables
 cat_color = "category20" 
 sequential_color = "viridis"
+divergent_color = "redblue"
 
 # Load data
 data = get_data()
@@ -24,8 +25,12 @@ L'obiettivo di questo progetto è quello di sviluppare un'applicazione per visua
  """
 st.write("Il dataset contiene", data.shape[0], "prenotazioni e ", data.shape[1], "variabili, l'analisi si concentrerà solo su alcune di esse.")
 
-st.write(data.describe())
-"""In particolare ci chiediamo: 
+st.write(data.drop(pl.col("index")).describe())
+
+####SISTEMARE
+"""
+Per maggiori informazioni sulle variabili del dataset puoi consultare la [documentazione (???????????????????????) 
+In particolare ci chiediamo: 
 - Quante persone cancellano la prenotazione?
 - Quali variabili influenzano la cancellazione?"""
 
@@ -102,9 +107,10 @@ chart = alt.Chart(data).mark_boxplot().encode(
     alt.X('adr:Q', title='Prezzo medio per notte (€)'),
     alt.Facet("hotel:N", title = ""),
     alt.Color("hotel:N", title="Tipo di hotel")
-
 ).properties(
-    title="Distribuzione del prezzo medio per notte per tipo di hotel")
+    title="Distribuzione del prezzo medio per notte per tipo di hotel",
+    height = 50
+)
 
 st.altair_chart(chart, use_container_width=True)
 """
@@ -175,6 +181,22 @@ chart = alt.Chart(data.with_columns(
             scale=alt.Scale(scheme=cat_color)),
 )
 st.altair_chart(chart, use_container_width=True)
+
+chart =alt.Chart(data).mark_area().encode(
+    y = alt.Y( "count()").stack("normalize"),
+    x = alt.X("arrival_date:T"),
+    color= alt.Color("hotel:N")
+)
+st.altair_chart(chart, use_container_width=True)
+
+chart = alt.Chart(data).mark_circle().encode(
+    y='arrival_date_month_n:O',
+    x='arrival_date_year:O',
+    size='count():Q',
+    facet = "hotel:N",
+    color = 'hotel:N'
+)
+st.altair_chart(chart, use_container_width= True)
 """
 Numero di prenotazioni nei Resort è quasi costante mentre quella degli hotel di città hanno picchi maggiori 
 sopratutto in Ottobre e primi mesi estivi.
@@ -197,15 +219,13 @@ chart = alt.Chart(data).mark_area().encode(
     alt.Color("is_canceled:N", title="Cancellazione",
             scale=alt.Scale(scheme=cat_color)),
     alt.Facet("hotel:N")
-).properties(title="Lead time per tipo di hotel")
+).interactive().properties(title="Lead time per tipo di hotel")
 st.altair_chart(chart, use_container_width=True)
 """
 Più aumenta il tempo tra prenotazione e arrivo, più aumenta il tasso di cancellazione.
 City hotel hanno una distribuzione di lead time più "distesa" rispetto a quella dei Resort hotel, che tendono ad avere più clienti che prenotano
 a ridosso della data di arrivo.
 """
-
-
 
 if  st.selectbox("Vuoi visualizzare la distribuzione delle prenotazioni in tutto il mondo o solo in Europa", [ "Europa","Mondo"]) == "Europa":
     map_type = "azimuthalEqualArea"
@@ -303,7 +323,7 @@ temp = data.filter((pl.col("adr")<=65) & (pl.col("hotel") == "City Hotel")).with
     pl.count().alias("numero di prenotazioni"), pl.col("is_canceled").cast(pl.Float64).mean().alias("tasso di cancellazione"))
 st.write( temp )
 """
-Tabella restanti prenotazioni:"""
+Tabella delle restanti prenotazioni:"""
 temp1 = data.filter((pl.col("adr")>65) | (pl.col("hotel") != "City Hotel")).with_columns(
     pl.when(pl.col("country") == "PRT").then(pl.lit("Portogallo")).otherwise(pl.lit("Altri Paesi")).alias("country")
 ).group_by("country").agg(
@@ -319,10 +339,159 @@ possiamo utilizzare un test statistico per verificare l'assunzione di indipenden
 """
 st.write(f"La statistica test è pari a {chi}",f" con un P-value di {p}")
 """ 
-Quindi abbiamo un ulteriore indizio a favore dell'ipotesi fatta in precedenza.
+Oltre a questo vediamo anche che i tassi di cancellazione sono molto diversi tra loro 
+con una quasi separazione netta tra clienti provenienti dal Portogallo e quelli provenienti da altri paesi.
+
+Quindi si può concludere dicendo che c'è un ulteriore indizio a favore dell'ipotesi fatta in precedenza.
+
+Ora analizzeremo se esistono altre variabili utili per aiutare l'hotel a prevedere la cancellazione della prenotazione 
+e definire politiche mirate per ridurne il tasso.
+
+Se un cliente è incline a fare molti cambiamenti alla prenotazione, tenderà a cancellarla più facilmente?
+Se un cliente in passato ha cancellato prenotazioni, è più probabile che lo faccia di nuovo?
+Se la prenotazione è di un cliente abituale, è più probabile che non venga cancellata?
+Se un cliente fa richieste speciali, è più probabile che non cancelli la prenotazione?
+Come può l'hotel ridurre le prenotazioni cancellate? Può essere utile l'utilizzo di cauzioni?
 """
 
-#book changes 
-#special requests
-# deposit type
 
+# book changes
+chart = bar_chart(data.with_columns(pl.when(pl.col("booking_changes")>1).then(pl.lit("2+")).otherwise("booking_changes").alias("booking_changes")), 
+ "booking_changes","count()", "is_canceled", cat_color)
+
+st.altair_chart(chart, use_container_width=True)
+"""
+Dal grafico si osserva che aumentando il numero di cambiamenti fatti, la prenotazione tende ad essere cancellata di meno, infatti abbiamo un rate di 
+0.41, poi di 0.14 ed infine di 0.19.
+Guardando questa associazione tra le 2 variabili si potrebbe ipotizzare che un cliente che tende a fare più cambiamenti
+sia un cliente più attento o propenso a soggiornare e quindi sia meno incline a disdire.
+
+Ora proviamo a verificare se c'è una qualche associazione tra il numero di richieste speciali e le cancellazioni.
+"""
+
+# total_of_special_requests
+chart = bar_chart(data.with_columns(pl.when((pl.col("total_of_special_requests"))>1).then(pl.lit("2+")).otherwise("total_of_special_requests").alias("total_of_special_requests"))
+    , "total_of_special_requests","count()","is_canceled", cat_color)
+st.altair_chart(chart)
+"""
+Anche in questo caso, il grafico ci suggerisce che più richieste si associano a meno cancellazioni, infatti i clienti con 0 richieste speciali 
+hanno un tasso di cancellazione del 48%. Questo rafforza l'ipotesi che un cliente 
+più propenso a intervenire sulla prenotazione sia un cliente che cancellerà meno frequentemente.
+
+Osserviamo ora se il comportamento dei clienti abituali possa essere un informazione utile agli hotel.
+Si precisa che il numero di prenotazioni fatte da clienti abituali nel dataset è di soli 3497.
+"""
+# is_repeated_guest
+chart = alt.Chart(data).mark_arc().encode(
+    theta=alt.Theta("count()"),
+    color=alt.Color(
+        "is_canceled:N",
+        scale=alt.Scale(scheme = cat_color),
+        title="cancellazione"
+    ),
+    facet=alt.Facet(
+        "is_repeated_guest:N",
+        title="",
+        header=alt.Header(
+            titleOrient="bottom",
+            labelOrient="bottom",
+            labelExpr='datum.value ? "Cliente Abituale" : "Nuovo Cliente"'
+        )
+    )
+).properties(
+    title="Grafico a torta delle cancellazioni per clienti ripetuti e non"
+)
+st.altair_chart(chart, use_container_width=True)
+"""
+Come si poteva immaginare i clienti abituali cancellano meno rispetto ai nuovi clienti.
+
+Ora ci soffermiamo sulle variabili previous_cancellations, previous_bookings_not_canceled che rappresentano il numero di cancellazioni
+fatte in precedenza e il numero di prenotazioni non cancellate, questo dato non si riferisce allo stesso hotel ma a tutti gli hotel 
+in un periodo precedente. 
+Per l'analisi sono state divise le prenotazioni in 4 gruppi ossia:
+- Clienti che non avevano ne cancellazioni ne prenotazioni passate (andate a buon fine).
+- Clienti con solo cancellazioni passate.
+- Clienti con solo prenotazioni senza cancellazioni.
+- Clienti con sia cancellazioni passate che non, essendo poche osservazioni non è stato
+  considerato quale delle 2 è maggiore.
+"""
+# preparation data
+temp = data.filter(pl.col("is_canceled") == 1).with_columns(
+    pl.when(pl.col("previous_cancellations") > 0).then(pl.lit("CANCELLAZIONI PASSATE")).otherwise(pl.lit("NO CANCELLAZIONI PASSATE")).alias("previous_cancellations"),
+    pl.when(pl.col("previous_bookings_not_canceled") > 0).then(pl.lit("PRENOTAZIONI PASSATE")).otherwise(pl.lit("NO PRENOTAZIONI PASSATE")).alias("previous_bookings_not_canceled")
+).group_by(
+    pl.col("previous_cancellations"),
+    pl.col("previous_bookings_not_canceled")
+).count()
+
+temp_total = data.with_columns(
+    pl.when(pl.col("previous_cancellations") > 0).then(pl.lit("CANCELLAZIONI PASSATE")).otherwise(pl.lit("NO CANCELLAZIONI PASSATE")).alias("previous_cancellations"),
+    pl.when(pl.col("previous_bookings_not_canceled") > 0).then(pl.lit("PRENOTAZIONI PASSATE")).otherwise(pl.lit("NO PRENOTAZIONI PASSATE")).alias("previous_bookings_not_canceled")
+).group_by(
+    pl.col("previous_cancellations"),
+    pl.col("previous_bookings_not_canceled")
+).count()
+
+temp_join = temp_total.join(temp,left_on=["previous_cancellations","previous_bookings_not_canceled"],
+    right_on=["previous_cancellations","previous_bookings_not_canceled"])
+temp_join = temp_join.with_columns(
+    (pl.col("count_right")/pl.col("count")).alias("rate")
+)
+temp_join.drop_in_place("count_right")
+
+# Heatmap and text
+chart = alt.Chart(temp_join).mark_rect().encode(
+    x=alt.X('previous_bookings_not_canceled:N', title='Prenotazioni Passate Non Cancellate'),
+    y=alt.Y('previous_cancellations:N', title='Cancellazioni Passate'),
+    color=alt.Color('rate:Q', scale=alt.Scale(domainMax= 1, domainMin=0,
+    domainMid=0.37,scheme=divergent_color), title='Tasso di cancellazione'),
+    tooltip=['previous_cancellations', 'previous_bookings_not_canceled', alt.Tooltip('rate:Q', format='.2f'), 'count']
+).properties(
+    title='Tasso di Cancellazione per Comportamento Passato',
+    height = 500
+)
+
+text = alt.Chart(temp_join).mark_text(size = 30).encode(
+    x=alt.X('previous_bookings_not_canceled:N'),
+    y=alt.Y('previous_cancellations:N'),
+    text = alt.Text("count")
+    )
+"""
+Qui sotto è rappresentata una heatmap dove il colore rappresenta il tasso di cancellazione di quel determinato gruppo di clienti
+Con indicato sopra il numero di prenotazioni presenti nel dataset.
+La scala dei colori è di tipo divergente con punto centrale il tasso di cancellazione di tutto il dataset (0.37).
+"""
+st.altair_chart(chart+text, use_container_width=True)
+"""
+I clienti che non avevano ne cancellazioni passate ne prenotazioni andate a buon fine sono il gruppo più numeroso
+e hanno un tasso di cancellazione chiaramenti più simile a quello della totalità del dataset.
+Osservando gli altri gruppi più piccoli possiamo però fare delle ipotesi utili, ad esempio si osserva
+che i clienti con solo cancellazioni precedenti hanno un tasso estremamente alto pari a 0.84.
+I clienti che invece hanno avuto prenotazioni passate andate a buon fine a prescindere dal fatto di aver cancellato o meno almeno una 
+volta in precedenza, hanno tassi di cancellazione molto bassi pari a 0.14 (no canc. passate) e 0.19 .
+
+Questa informazione, insieme alle conclusioni trovate dai dati precedenti sui clienti abituali, 
+suggerisce che un possibile approccio efficace per ridurre le cancellazioni potrebbe essere quello di incentivare
+il ritorno degli ospiti già soggiornati che non hanno annullato la prenotazione, attraverso promozioni mirate o 
+altre strategie di fidelizzazione.
+
+Inoltre potrebbe essere utile l'organizzazione di dataset in collaborazione con altri hotel
+per tenere traccia dei clienti con tendenze a cancellare spesso.
+
+Oltre a quanto detto un hotel potrebbe valutare come politica per la riduzione delle cancellazioni
+l'inserimento o meno di una cauzione, rimborsabile o non.
+Per valutare ciò osserviamo che informazioni può dare la variabile deposit_type:
+"""
+# deposity_type
+chart = bar_chart(data,"deposit_type","count()","is_canceled",cat_color)
+chart = chart.encode(xOffset="is_canceled")
+chart = alt.Chart(data).mark_area().encode(
+    x=alt.X("lead_time:Q", title="Data di Arrivo"),
+    y=alt.Y("count()", title="Numero Prenotazioni", stack="normalize"), # Usa stack="normalize" per vedere le proporzioni
+    color=alt.Color("deposit_type:N", title="Tipo di Deposito")
+).properties(
+    title="Numero di Prenotazioni nel Tempo per Tipo di Deposito"
+)
+st.altair_chart(chart, use_container_width=True)
+
+# grafici modello
