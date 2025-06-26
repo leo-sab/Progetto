@@ -3,33 +3,35 @@ import polars as pl
 import altair as alt
 from preprocess import *
 from scipy.stats import chi2_contingency
+
+
+st.set_page_config(page_title="Hotel Bookings", page_icon="🏨", layout="centered")
+
 # global variables
 cat_color = "category20" 
 sequential_color = "viridis"
 divergent_color = "redblue"
 
+
 # Load data
-data = get_data()
-world = get_mapdata()
-joined = get_mapdata(data)
+data, world, joined = get_all()
 
 
 #### MAIN CODE ####
-st.set_page_config(page_title="Hotel Bookings", page_icon="🏨", layout="centered")
 
-st.title("Dashboard analisi prenotazioni hotel")
+st.title("EDA Prenotazioni Hotel")
 """
-L'obiettivo di questo progetto è quello di sviluppare un'applicazione per visualizzare variabili del dataset hotel_bookings relative a delle prenotazioni di clienti di
- hotel portoghesi nel periodo che va dall'agosto 2015 all'agosto 2017, indagando le principali cause di cancellazione e relazioni tra variabili con grafici e metodi di machine learning.
+Questo progetto ha come obiettivo l'analisi di un dataset di prenotazioni di hotel, si divide in 2 parti:
+- Analisi esplorativa dei dati, con visualizzazioni e grafici interattivi.
+- Creazione di un modello di previsione
 # Presentazione del dataset:
  """
 st.write("Il dataset contiene", data.shape[0], "prenotazioni e ", data.shape[1], "variabili, l'analisi si concentrerà solo su alcune di esse.")
 
-st.write(data.drop(pl.col("index")).describe())
+with  st.expander("Mostra summary dei dati ") : st.write(data.drop(pl.col("index")).describe())
 
-####SISTEMARE
 """
-Per maggiori informazioni sulle variabili del dataset puoi consultare la [documentazione (???????????????????????) 
+Per maggiori informazioni sulle variabili del dataset consultare il README
 In particolare ci chiediamo: 
 - Quante persone cancellano la prenotazione?
 - Quali variabili influenzano la cancellazione?"""
@@ -92,17 +94,18 @@ st.write("Come possiamo vedere dal grafico, nel dataset ci " \
 "cancellazione più alto, ossia", rate_city, " contro quello degli hotel resort che " \
 "è pari a ", rate_resort)
 """
-Questa differenza è chiaramente significativa e potrebbe essere dovuta a vari fattori,
-come ad esempio un tipo diverso di clientela, prezzi, prenotazioni fatte mediamente in tempi diversi o alla stagionalità.
-
-Proveremo in seguito ad indagare più a fondo.
+Questa differenza è potrebbe essere dovuta a vari fattori, 
+come ad esempio un tipo diverso di clientela, prezzi, prenotazioni fatte mediamente in tempi diversi o alla stagionalità;
+proveremo in seguito ad indagare più a fondo.
 """
 
 
 """
-Concentriamoci ora sulla variabile 'adr' (Average Daily Rate), 
+Vediamo ora come si distribuisce la variabile 'adr' (Average Daily Rate), 
 che rappresenta il prezzo medio per notte.
 """
+# boxplot adr
+
 chart = alt.Chart(data).mark_boxplot().encode(
     alt.X('adr:Q', title='Prezzo medio per notte (€)'),
     alt.Facet("hotel:N", title = ""),
@@ -114,8 +117,12 @@ chart = alt.Chart(data).mark_boxplot().encode(
 
 st.altair_chart(chart, use_container_width=True)
 """
-Vediamo che il prezzo degli hotel di città hanno un prezzo mediano più a ...
-
+Questo boxplot rappresenta la distribuzione del prezzo medio per notte per tuoi di hotel.
+La parte centrale rappresenta il 50% dei dati (tra il primo e il terzo quartile), la linea
+rappresenta la mediana, i punti fuori dalla parte centrale sono fli outliers.
+Si vede chiaramente che questa distribuzione è fortemente asimmetrica, si può vedere che gli hotel di città 
+hanno un prezzo mediano maggiore rispetto ai resort ma con hanno una distribuzione più "schiacciata" con code più corte 
+rispetto ai resort. 
 """
 
 # prepare data for chart
@@ -130,6 +137,7 @@ bin = temp.group_by("hotel","adr_bin").agg(
     pl.col("is_canceled").mean().alias("cancellation_rate"),
     pl.col("hotel").count().alias("count")
     )
+
 # buble chart adr_bin and hotel
 chart = alt.Chart(bin).mark_circle(size=100).encode(
     alt.X("adr_bin:N", title="Prezzo medio per notte", sort = labels),
@@ -144,34 +152,40 @@ st.altair_chart(chart, use_container_width=True)
 Il grafico rappresenta la variazione del tasso di cancellazione per fascie di prezzo (sono stati utilizzati i quantili 0.2,0.4,0.6,0.8 di adr) 
 dei 2 tipi di hotel, utilizzando la grandezza del cerchio per mostrare quante prenotazioni ci sono in ogni fascia.
 
-Notiamo che il tasso di cancellazione dei 2 tipi di hotel per la fascia di prezzo più bassa ha un comportamento opposto: 
+Si può notare che il tasso di cancellazione dei 2 tipi di hotel per la fascia di prezzo più bassa ha un comportamento opposto: 
 i resort hanno il tasso più basso mentre i city hotel il più alto. 
-Aumentando il prezzo quello dei resort tende a
+Aumentando il prezzo quello dei resort tende a salire mentre quello degli hotel di città tende a scendere.
+
 """
+# chart adr and arrival date, opaco
 chart = alt.Chart(data).mark_line(opacity = 0.4).encode(
     alt.X("arrival_date:T", title="Data di arrivo"),
-    alt.Y("mean(adr):Q", title="Prezzo medio per notte"),
+    alt.Y("median(adr):Q", title="Prezzo medio per notte"),
     alt.Color("hotel:N", title="Tipo di hotel",
             scale=alt.Scale(scheme=cat_color)),
 ).properties(
-    title="Andamento prezzo medio (con smoothing)"
+    title="Andamento prezzo mediano (con smoothing)"
 )
+# add smoothing 
 chart1 = alt.Chart(data.to_pandas()).transform_loess(
     "arrival_date", "adr", groupby=["hotel"], bandwidth=0.04
 ).mark_line().encode(
     alt.X("arrival_date:T"),
-    alt.Y("mean(adr):Q"),
+    alt.Y("median(adr):Q"),
     alt.Color("hotel:N", title="Tipo di hotel")
     )
 st.altair_chart(chart + chart1, use_container_width=True)
 
 """
-Il prezzo medio per notte per entrambi gli holel sembra in leggero aumento,
+Il seguente grafico rappresenta l'andamento del prezzo mediano durante preso in esame,per semplificare la visualizzazione
+ e rendere più evidente la stagionalità e il trend e rimuovere il rumore aggiunto lo smoothing.
+Il prezzo mediano per notte per entrambi ti tipi di hotel sembra in aumento,
 evidente stagionalità per i resort hotel, che hanno sempre il picco dei prezzi nel mese di Agosto (precisamente a Ferragosto).
 Da notare gli spike nel prezzo dei resort non catturati dallo smoothing verso fine Dicembre di entrambi gli anni che possiamo spiegare con 
 il capodanno.
 Il prezzo degli hotel di città invece risultano più stabili e mediamente maggiori dei resort. 
 """
+
 chart = alt.Chart(data.with_columns(
     (pl.col("arrival_date").dt.strftime("%Y-%m")).alias("month")
 )).mark_line().encode(
@@ -300,11 +314,12 @@ if st.checkbox("Vuoi un grafico che includa anche la numerosità delle prenotazi
 add_map(base + mappa)
 
 """
-L'analisi del grafico rivela che il Portogallo presenta uno dei tassi di cancellazione più elevati tra i Paesi visualizzati, 
-suggerendo una potenziale correlazione tra la localizzazione degli hotel e la frequenza di cancellazione. 
+L'analisi del grafico rivela che il Portogallo, nazione con più prenotazioni, presenta uno dei tassi di cancellazione più elevati tra i Paesi visualizzati, 
+questo ci suggerisce una potenziale separazione in 2 cluster (clienti locali e clienti stranieri). 
 Un'ipotesi plausibile è che la vicinanza geografica possa incentivare una maggiore propensione alla cancellazione da parte
  dei clienti che prenotano in Portogallo. 
- La ridotta incidenza di costi o complicazioni logistiche associate alla cancellazione per i clienti locali potrebbe contribuire a questo fenomeno.
+ La ridotta incidenza di costi o complicazioni logistiche associate alla cancellazione per i clienti locali potrebbero contribuire 
+ a fare prenotazioni con più leggerezza rispetto a chi provviene dall'estero.
 
 Questa osservazione potrebbe fornire spunti per interpretare le differenze nei tassi di cancellazione riscontrate negli hotel di 
 città appartenenti a fasce di prezzo inferiori. Se una porzione considerevole della clientela di tali strutture è costituita da residenti portoghesi, 
@@ -312,25 +327,33 @@ la loro ipotizzata maggiore tendenza alla cancellazione potrebbe essere un fatto
 
 Parallelamente, si potrebbe ipotizzare un effetto di auto-selezione di tipo economico tra i clienti internazionali che viaggiano in Portogallo.
 I viaggiatori stranieri, affrontando costi e impegni maggiori legati al viaggio, potrebbero dimostrare una minore propensione alla cancellazione, 
-specialmente se orientati verso hotel di fascia di prezzo più alta. Questa dinamica suggerisce una potenziale relazione tra la nazionalità del cliente, 
-la fascia di prezzo dell'hotel e la probabilità di cancellazione, meritevole di ulteriori indagini.
+specialmente se orientati verso hotel di fascia di prezzo più alta. 
 
-Tabella hotel di città con adr <= 65:
+Tabella di tutte le prenotazioni:
 """
-temp = data.filter((pl.col("adr")<=65) & (pl.col("hotel") == "City Hotel")).with_columns(
+temp = data.with_columns(
     pl.when(pl.col("country") == "PRT").then(pl.lit("Portogallo")).otherwise(pl.lit("Altri Paesi")).alias("country")
 ).group_by("country").agg(
-    pl.count().alias("numero di prenotazioni"), pl.col("is_canceled").cast(pl.Float64).mean().alias("tasso di cancellazione"))
+    pl.len().alias("numero di prenotazioni"),pl.col("is_canceled").mean().alias("tasso di cancellazione"))
 st.write( temp )
 """
-Tabella delle restanti prenotazioni:"""
-temp1 = data.filter((pl.col("adr")>65) | (pl.col("hotel") != "City Hotel")).with_columns(
+Tabella hotel di città con adr <= 65:
+"""
+temp1 = data.filter((pl.col("adr")<=65) & (pl.col("hotel") == "City Hotel")).with_columns(
     pl.when(pl.col("country") == "PRT").then(pl.lit("Portogallo")).otherwise(pl.lit("Altri Paesi")).alias("country")
 ).group_by("country").agg(
-    pl.count().alias("numero di prenotazioni"),pl.col("is_canceled").mean().alias("tasso di cancellazione"))
+    pl.len().alias("numero di prenotazioni"), pl.col("is_canceled").cast(pl.Float64).mean().alias("tasso di cancellazione"))
 st.write( temp1 )
+"""
+Tabella Resort Hotel con adr <= 65:
+"""
+temp2 = data.filter((pl.col("adr")<=65) & (pl.col("hotel") == "Resort Hotel")).with_columns(
+    pl.when(pl.col("country") == "PRT").then(pl.lit("Portogallo")).otherwise(pl.lit("Altri Paesi")).alias("country")
+).group_by("country").agg(
+    pl.len().alias("numero di prenotazioni"), pl.col("is_canceled").cast(pl.Float64).mean().alias("tasso di cancellazione"))
+st.write( temp2 )
 
-observed = pl.concat([temp,temp1]).select(pl.col("numero di prenotazioni")).to_numpy().reshape(2,2)
+observed = pl.concat([temp1,temp2]).select(pl.col("numero di prenotazioni")).to_numpy().reshape(2,2)
 
 chi ,p  = chi2(observed)
 """
@@ -372,7 +395,7 @@ Ora proviamo a verificare se c'è una qualche associazione tra il numero di rich
 # total_of_special_requests
 chart = bar_chart(data.with_columns(pl.when((pl.col("total_of_special_requests"))>1).then(pl.lit("2+")).otherwise("total_of_special_requests").alias("total_of_special_requests"))
     , "total_of_special_requests","count()","is_canceled", cat_color)
-st.altair_chart(chart)
+st.altair_chart(chart, use_container_width=True)
 """
 Anche in questo caso, il grafico ci suggerisce che più richieste si associano a meno cancellazioni, infatti i clienti con 0 richieste speciali 
 hanno un tasso di cancellazione del 48%. Questo rafforza l'ipotesi che un cliente 
@@ -422,21 +445,23 @@ temp = data.filter(pl.col("is_canceled") == 1).with_columns(
 ).group_by(
     pl.col("previous_cancellations"),
     pl.col("previous_bookings_not_canceled")
-).count()
-
+).agg(
+    pl.len().alias("count"))
 temp_total = data.with_columns(
     pl.when(pl.col("previous_cancellations") > 0).then(pl.lit("CANCELLAZIONI PASSATE")).otherwise(pl.lit("NO CANCELLAZIONI PASSATE")).alias("previous_cancellations"),
     pl.when(pl.col("previous_bookings_not_canceled") > 0).then(pl.lit("PRENOTAZIONI PASSATE")).otherwise(pl.lit("NO PRENOTAZIONI PASSATE")).alias("previous_bookings_not_canceled")
 ).group_by(
     pl.col("previous_cancellations"),
     pl.col("previous_bookings_not_canceled")
-).count()
+).agg(
+    pl.len().alias("count"))
 
 temp_join = temp_total.join(temp,left_on=["previous_cancellations","previous_bookings_not_canceled"],
     right_on=["previous_cancellations","previous_bookings_not_canceled"])
 temp_join = temp_join.with_columns(
     (pl.col("count_right")/pl.col("count")).alias("rate")
 )
+
 temp_join.drop_in_place("count_right")
 
 # Heatmap and text
@@ -464,15 +489,15 @@ La scala dei colori è di tipo divergente con punto centrale il tasso di cancell
 st.altair_chart(chart+text, use_container_width=True)
 """
 I clienti che non avevano ne cancellazioni passate ne prenotazioni andate a buon fine sono il gruppo più numeroso
-e hanno un tasso di cancellazione chiaramenti più simile a quello della totalità del dataset.
-Osservando gli altri gruppi più piccoli possiamo però fare delle ipotesi utili, ad esempio si osserva
+e hanno un tasso di cancellazione ovviamente simile a quello della totalità del dataset.
+Osservando gli altri gruppi più piccoli e ricordando che correlazione non significa causalitàm, possiamo fare delle ipotesi utili, ad esempio si osserva
 che i clienti con solo cancellazioni precedenti hanno un tasso estremamente alto pari a 0.84.
 I clienti che invece hanno avuto prenotazioni passate andate a buon fine a prescindere dal fatto di aver cancellato o meno almeno una 
-volta in precedenza, hanno tassi di cancellazione molto bassi pari a 0.14 (no canc. passate) e 0.19 .
+volta in precedenza, hanno tassi di cancellazione molto bassi pari a 0.14 (no canc. passate) e 0.19.
 
 Questa informazione, insieme alle conclusioni trovate dai dati precedenti sui clienti abituali, 
-suggerisce che un possibile approccio efficace per ridurre le cancellazioni potrebbe essere quello di incentivare
-il ritorno degli ospiti già soggiornati che non hanno annullato la prenotazione, attraverso promozioni mirate o 
+suggerisce che un possibile approccio efficace da testare per ridurre le cancellazioni potrebbe essere quello di incentivare
+il ritorno degli ospiti già soggiornati che almeno una volta non hanno annullato la prenotazione, attraverso promozioni mirate o 
 altre strategie di fidelizzazione.
 
 Inoltre potrebbe essere utile l'organizzazione di dataset in collaborazione con altri hotel
@@ -483,15 +508,36 @@ l'inserimento o meno di una cauzione, rimborsabile o non.
 Per valutare ciò osserviamo che informazioni può dare la variabile deposit_type:
 """
 # deposity_type
-chart = bar_chart(data,"deposit_type","count()","is_canceled",cat_color)
-chart = chart.encode(xOffset="is_canceled")
-chart = alt.Chart(data).mark_area().encode(
-    x=alt.X("lead_time:Q", title="Data di Arrivo"),
-    y=alt.Y("count()", title="Numero Prenotazioni", stack="normalize"), # Usa stack="normalize" per vedere le proporzioni
-    color=alt.Color("deposit_type:N", title="Tipo di Deposito")
+count_chart = alt.Chart(data).mark_bar().encode(
+    x=alt.X('deposit_type:N', title='Tipo di Cauzione'),
+    y=alt.Y('count()', title='Numero di Prenotazioni'),
+    color=alt.Color('is_canceled:O', title='Stato Prenotazione',
+                    scale=alt.Scale(domain=[0,1], range=['#4C78A8','#F58518'])),
+    tooltip=[
+        alt.Tooltip('deposit_type:N', title='Tipo Cauzione'),
+        alt.Tooltip('is_canceled:O', title='Cancellata?'),
+        alt.Tooltip('count()', title='Conteggio')
+    ]
 ).properties(
-    title="Numero di Prenotazioni nel Tempo per Tipo di Deposito"
+    title='Prenotazioni e Cancellazioni per Tipo di Cauzione',
+    width=600
 )
-st.altair_chart(chart, use_container_width=True)
 
-# grafici modello
+# 2) Tasso di cancellazione
+rate_chart = alt.Chart(data).transform_aggregate(
+    cancel_rate='mean(is_canceled)', 
+    groupby=['deposit_type']
+).mark_bar().encode(
+    x=alt.X('deposit_type:N', title='Tipo di Cauzione'),
+    y=alt.Y('cancel_rate:Q', title='Tasso di Cancellazione', axis=alt.Axis(format='%')),
+    tooltip=[
+        alt.Tooltip('deposit_type:N', title='Tipo Cauzione'),
+        alt.Tooltip('cancel_rate:Q', title='Cancel Rate', format='.1%')
+    ]
+).properties(
+    title='Tasso di Cancellazione per Tipo di Cauzione',
+    width=600
+)
+
+st.subheader("Analisi di `deposit_type`")
+st.altair_chart(count_chart & rate_chart, use_container_width=True)
