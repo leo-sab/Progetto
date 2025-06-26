@@ -9,6 +9,7 @@ st.set_page_config(page_title="Hotel Bookings", page_icon="🏨", layout="center
 
 # global variables
 cat_color = "category20" 
+cat_color1 = "set2"
 sequential_color = "viridis"
 divergent_color = "redblue"
 
@@ -24,7 +25,7 @@ st.title("EDA Prenotazioni Hotel")
 Questo progetto ha come obiettivo l'analisi di un dataset di prenotazioni di hotel, si divide in 2 parti:
 - Analisi esplorativa dei dati, con visualizzazioni e grafici interattivi.
 - Creazione di un modello di previsione
-# Presentazione del dataset:
+## Presentazione del dataset:
  """
 st.write("Il dataset contiene", data.shape[0], "prenotazioni e ", data.shape[1], "variabili, l'analisi si concentrerà solo su alcune di esse.")
 
@@ -49,7 +50,7 @@ chart = base.mark_bar().encode(
     alt.X("is_canceled:N", title="Cancellazione"),
     alt.Y("count:Q", title="Numero Prenotazioni"),
     alt.Color("is_canceled:N", title="Cancellazione", 
-            scale=alt.Scale(scheme=cat_color))
+            scale=alt.Scale(scheme=cat_color1))
 )
 
 text = base.mark_text(
@@ -97,10 +98,8 @@ st.write("Come possiamo vedere dal grafico, nel dataset ci " \
 Questa differenza è potrebbe essere dovuta a vari fattori, 
 come ad esempio un tipo diverso di clientela, prezzi, prenotazioni fatte mediamente in tempi diversi o alla stagionalità;
 proveremo in seguito ad indagare più a fondo.
-"""
 
-
-"""
+## Analisi grafica sull'effetto delle principali esplicative sul tasso di cancellazione e sul tipo di hotel
 Vediamo ora come si distribuisce la variabile 'adr' (Average Daily Rate), 
 che rappresenta il prezzo medio per notte.
 """
@@ -184,8 +183,9 @@ evidente stagionalità per i resort hotel, che hanno sempre il picco dei prezzi 
 Da notare gli spike nel prezzo dei resort non catturati dallo smoothing verso fine Dicembre di entrambi gli anni che possiamo spiegare con 
 il capodanno.
 Il prezzo degli hotel di città invece risultano più stabili e mediamente maggiori dei resort. 
-"""
 
+"""
+# chart arrival date and n prenotations by hotel
 chart = alt.Chart(data.with_columns(
     (pl.col("arrival_date").dt.strftime("%Y-%m")).alias("month")
 )).mark_line().encode(
@@ -193,52 +193,68 @@ chart = alt.Chart(data.with_columns(
     alt.Y("count()", title="Numero Prenotazioni"),
     alt.Color("hotel:N", title="Tipo di hotel",
             scale=alt.Scale(scheme=cat_color)),
-)
+).properties(title = "Serie storica: numero di prenotazioni per tipo di hotel")
 st.altair_chart(chart, use_container_width=True)
-
+"""Il grafico (aggregati per mese) mostra come evolve il numero di prenotazioni nel tempo, si vede che
+i resort hanno una domanda quasi costante mentre quelli di città sembrerebbero avere una
+più marcata stagionalità con 2 picchi annuali: a Ottobre e ad Aprile.
+Qui sotto vediamo come sono distribuiti nel tempo (in percentuale) nel dataset."""
+#area chart % n prenotation by hotel
 chart =alt.Chart(data).mark_area().encode(
-    y = alt.Y( "count()").stack("normalize"),
-    x = alt.X("arrival_date:T"),
-    color= alt.Color("hotel:N")
+    y = alt.Y( "count()",title = "frequenza relativa n prenotazioni").stack("normalize"),
+    x = alt.X("arrival_date:T",title = "Data di arrivo"),
+    color= alt.Color("hotel:N",scale = alt.Scale(scheme=cat_color))
 )
 st.altair_chart(chart, use_container_width=True)
-
-chart = alt.Chart(data).mark_circle().encode(
-    y='arrival_date_month_n:O',
-    x='arrival_date_year:O',
-    size='count():Q',
-    facet = "hotel:N",
-    color = 'hotel:N'
-)
-st.altair_chart(chart, use_container_width= True)
 """
-Numero di prenotazioni nei Resort è quasi costante mentre quella degli hotel di città hanno picchi maggiori 
-sopratutto in Ottobre e primi mesi estivi.
+Il grafico rappresenta il rapporto tra Resort e hotel di città, la differenza sembra meno
+marcata rispetto al primo grafico perché le prenotazioni non sono stare aggregate per mese e anno.
+Vediamo come si comporta la variabile di nostro interesse nel tempo:
 """
 
+# n canceled and not chart
 chart = alt.Chart(data.with_columns(
     (pl.col("arrival_date").dt.strftime("%Y-%m")).alias("month")
 )).mark_line().encode(
     alt.X("month:T",title="Data di arrivo"),
     alt.Y("count()", title="Numero Prenotazioni",),
     alt.Color("is_canceled:N", title="Cancellazione",
-            scale=alt.Scale(scheme=cat_color)),
-)
+            scale=alt.Scale(scheme=cat_color1)),
+).properties(title = "Serie storica numero di prenotazioni: cancellate e non cancellate")
 st.altair_chart(chart, use_container_width=True)
+"""
+Si osserva che il numero di prenotazioni non cancellate è costantemente più alto rispetto a 
+quelle cancellate, con andamenti paralleli che evidenziano una stagionalità simile per entrambe.
+ Tuttavia, in alcuni periodi (es. metà 2016, inizio 2017), si nota un aumento relativo delle cancellazioni, 
+ che potrebbe indicare problemi operativi o variazioni nella domanda.
+
+ Vediamo ora come la variabile lead_time ossia numero di giorni tra la prenotazione
+ e la data si soggiorno può dare informazioni sulla cancellazione o meno della prenotazione.
+ 
+ """
+
 
 # chart lead time and type of hotel
 chart = alt.Chart(data).mark_area().encode(
     alt.X("lead_time:Q", title="Lead time", scale  = alt.Scale(domain=[0, 630])),
     alt.Y("count()", title="Numero Prenotazioni"),
     alt.Color("is_canceled:N", title="Cancellazione",
-            scale=alt.Scale(scheme=cat_color)),
+            scale=alt.Scale(scheme=cat_color1)),
     alt.Facet("hotel:N")
 ).interactive().properties(title="Lead time per tipo di hotel")
 st.altair_chart(chart, use_container_width=True)
 """
-Più aumenta il tempo tra prenotazione e arrivo, più aumenta il tasso di cancellazione.
-City hotel hanno una distribuzione di lead time più "distesa" rispetto a quella dei Resort hotel, che tendono ad avere più clienti che prenotano
-a ridosso della data di arrivo.
+Il grafico rappresenta la distribuzione per lead_time del numero di prenotazioni cancellate o meno ,
+con Facet per tipo di hotel, si può zoomare per vedere meglio le code.
+Si osserva che in entrambi i grafici più aumenta il tempo tra prenotazione e arrivo, più aumenta il tasso di cancellazione.
+In quello dei City hotel, la distribuzione di lead time è più "distesa" rispetto a quella dei Resort hotel, 
+questo ci dice che tendono ad avere più clienti che prenotano a ridosso della data di arrivo.
+Potrebbe essere uno dei fattori che spiega la differenza tra i 2 tipi di hotel.
+
+### Distribuzione geografica
+
+Ci chiediamo ora se la provenienza del cliente possa essere o meno un'informazione utile, ma prima 
+vediamo come si distribuiscono le prenotazioni nel nostro dataset con il seguente grafico (interativo):
 """
 
 if  st.selectbox("Vuoi visualizzare la distribuzione delle prenotazioni in tutto il mondo o solo in Europa", [ "Europa","Mondo"]) == "Europa":
@@ -276,8 +292,12 @@ mappa = alt.Chart(joined).mark_geoshape().encode(
 add_map(chart + mappa)
 """
 La mappa mostra la distribuzione delle prenotazioni in tutto il mondo,
-vediamo che la maggior parte delle prenotazioni proviene da paesi europei, in particolare dal Portogallo (puoi visualizzare le prenotazioni su una scala 
-che va da 0 alla seconda più numerosa spuntando la casella "Escludendo il Portogallo").
+vediamo che la maggior parte delle prenotazioni proviene da paesi europei, in particolare dal Portogallo (si può visualizzare 
+il grafico escludendo il Portogallo e cambiando la scala se ci si vuole concentrare sui clienti "non locali").
+
+Ora vediamo come varia il tasso di cancellazione, con il seguente grafico, (selezionare la spunta se si vuole mantenere 
+l'informazione sulla numerosità, ATTENZIONE è in scala logaritmica) :
+
 """
 if st.selectbox("Seleziona mondo o europa", [ "Europa","Mondo"]) == "Europa":
     map_type = "azimuthalEqualArea"
@@ -307,7 +327,7 @@ mappa = alt.Chart(joined).mark_geoshape().encode(
     title="Tasso di Cancellazione"
 )
 
-if st.checkbox("Vuoi un grafico che includa anche la numerosità delle prenotazioni (in scala logaritmica) per una migliore visualizzazione? ", [False, True]) == True:
+if st.checkbox("Inclusione della numerosità delle prenotazioni (in scala logaritmica) ", [False, True]) == True:
     mappa = mappa.encode(opacity=alt.Opacity('count:Q', scale=alt.Scale(type = "log",range=[0,1]),
                  legend=alt.Legend(title="Numero Prenotazioni",orient="top-left", format=".0f")))
 
@@ -363,24 +383,24 @@ possiamo utilizzare un test statistico per verificare l'assunzione di indipenden
 st.write(f"La statistica test è pari a {chi}",f" con un P-value di {p}")
 """ 
 Oltre a questo vediamo anche che i tassi di cancellazione sono molto diversi tra loro 
-con una quasi separazione netta tra clienti provenienti dal Portogallo e quelli provenienti da altri paesi.
+con una quasi separazione netta tra clienti provenienti dal Portogallo e quelli provenienti da altri paesi
+, soprattutto per gli hotel di città.
 
-Quindi si può concludere dicendo che c'è un ulteriore indizio a favore dell'ipotesi fatta in precedenza.
+Questo ci suggerisce che i clienti portoghesi e non degli hotel di città sono molto diversi, di più rispetto
+a quelli dei Resort, si potrebbe approfondire la seguente relazione andando ad indagare i motivi del soggiorno.
 
-Ora analizzeremo se esistono altre variabili utili per aiutare l'hotel a prevedere la cancellazione della prenotazione 
-e definire politiche mirate per ridurne il tasso.
 
-Se un cliente è incline a fare molti cambiamenti alla prenotazione, tenderà a cancellarla più facilmente?
-Se un cliente in passato ha cancellato prenotazioni, è più probabile che lo faccia di nuovo?
-Se la prenotazione è di un cliente abituale, è più probabile che non venga cancellata?
-Se un cliente fa richieste speciali, è più probabile che non cancelli la prenotazione?
-Come può l'hotel ridurre le prenotazioni cancellate? Può essere utile l'utilizzo di cauzioni?
+- Se un cliente è incline a fare molti cambiamenti alla prenotazione, tenderà a cancellarla più facilmente?
+- Se un cliente in passato ha cancellato prenotazioni, è più probabile che lo faccia di nuovo?
+- Se la prenotazione è di un cliente abituale, è più probabile che non venga cancellata?
+- Se un cliente fa richieste speciali, è più probabile che non cancelli la prenotazione?
+- Come può l'hotel ridurre le prenotazioni cancellate? Può essere utile l'utilizzo di cauzioni?
 """
 
 
 # book changes
 chart = bar_chart(data.with_columns(pl.when(pl.col("booking_changes")>1).then(pl.lit("2+")).otherwise("booking_changes").alias("booking_changes")), 
- "booking_changes","count()", "is_canceled", cat_color)
+ "booking_changes","count()", "is_canceled", cat_color1)
 
 st.altair_chart(chart, use_container_width=True)
 """
@@ -394,7 +414,7 @@ Ora proviamo a verificare se c'è una qualche associazione tra il numero di rich
 
 # total_of_special_requests
 chart = bar_chart(data.with_columns(pl.when((pl.col("total_of_special_requests"))>1).then(pl.lit("2+")).otherwise("total_of_special_requests").alias("total_of_special_requests"))
-    , "total_of_special_requests","count()","is_canceled", cat_color)
+    , "total_of_special_requests","count()","is_canceled", cat_color1)
 st.altair_chart(chart, use_container_width=True)
 """
 Anche in questo caso, il grafico ci suggerisce che più richieste si associano a meno cancellazioni, infatti i clienti con 0 richieste speciali 
@@ -404,33 +424,36 @@ più propenso a intervenire sulla prenotazione sia un cliente che cancellerà me
 Osserviamo ora se il comportamento dei clienti abituali possa essere un informazione utile agli hotel.
 Si precisa che il numero di prenotazioni fatte da clienti abituali nel dataset è di soli 3497.
 """
-# is_repeated_guest
-chart = alt.Chart(data).mark_arc().encode(
-    theta=alt.Theta("count()"),
-    color=alt.Color(
-        "is_canceled:N",
-        scale=alt.Scale(scheme = cat_color),
-        title="cancellazione"
-    ),
-    facet=alt.Facet(
-        "is_repeated_guest:N",
-        title="",
-        header=alt.Header(
-            titleOrient="bottom",
-            labelOrient="bottom",
-            labelExpr='datum.value ? "Cliente Abituale" : "Nuovo Cliente"'
+
+col1, col2 = st.columns(2)# is_repeated_guest
+with col1:
+    chart = alt.Chart(data.filter(pl.col("is_repeated_guest")==0)).mark_arc().encode(
+        theta=alt.Theta("count()"),
+        color=alt.Color(
+            "is_canceled:N",
+            scale=alt.Scale(scheme = cat_color),
+            title="cancellazione"
         )
-    )
-).properties(
-    title="Grafico a torta delle cancellazioni per clienti ripetuti e non"
-)
-st.altair_chart(chart, use_container_width=True)
+    ).properties(title = "Nuovo cliente") 
+    st.altair_chart(chart, use_container_width=True)
+with col2:
+    chart1 = alt.Chart(data.filter(pl.col("is_repeated_guest")==1)).mark_arc().encode(
+        theta=alt.Theta("count()"),
+        color=alt.Color(
+            "is_canceled:N",
+            scale=alt.Scale(scheme = cat_color),
+            title="cancellazione"
+        )
+    ).properties(title = "Cliente abituale")  
+    st.altair_chart(chart1, use_container_width=True)
+
 """
-Come si poteva immaginare i clienti abituali cancellano meno rispetto ai nuovi clienti.
+Come ci si poteva aspettare, il grafico mostra che i clienti abituali cancellano meno rispetto ai nuovi clienti.
 
 Ora ci soffermiamo sulle variabili previous_cancellations, previous_bookings_not_canceled che rappresentano il numero di cancellazioni
 fatte in precedenza e il numero di prenotazioni non cancellate, questo dato non si riferisce allo stesso hotel ma a tutti gli hotel 
 in un periodo precedente. 
+
 Per l'analisi sono state divise le prenotazioni in 4 gruppi ossia:
 - Clienti che non avevano ne cancellazioni ne prenotazioni passate (andate a buon fine).
 - Clienti con solo cancellazioni passate.
@@ -490,7 +513,7 @@ st.altair_chart(chart+text, use_container_width=True)
 """
 I clienti che non avevano ne cancellazioni passate ne prenotazioni andate a buon fine sono il gruppo più numeroso
 e hanno un tasso di cancellazione ovviamente simile a quello della totalità del dataset.
-Osservando gli altri gruppi più piccoli e ricordando che correlazione non significa causalitàm, possiamo fare delle ipotesi utili, ad esempio si osserva
+Osservando gli altri gruppi più piccoli e ricordando che una correlazione non significa causalità, possiamo fare delle ipotesi utili, ad esempio si osserva
 che i clienti con solo cancellazioni precedenti hanno un tasso estremamente alto pari a 0.84.
 I clienti che invece hanno avuto prenotazioni passate andate a buon fine a prescindere dal fatto di aver cancellato o meno almeno una 
 volta in precedenza, hanno tassi di cancellazione molto bassi pari a 0.14 (no canc. passate) e 0.19.
@@ -512,7 +535,7 @@ count_chart = alt.Chart(data).mark_bar().encode(
     x=alt.X('deposit_type:N', title='Tipo di Cauzione'),
     y=alt.Y('count()', title='Numero di Prenotazioni'),
     color=alt.Color('is_canceled:O', title='Stato Prenotazione',
-                    scale=alt.Scale(domain=[0,1], range=['#4C78A8','#F58518'])),
+                    scale=alt.Scale( scheme = cat_color1)),
     tooltip=[
         alt.Tooltip('deposit_type:N', title='Tipo Cauzione'),
         alt.Tooltip('is_canceled:O', title='Cancellata?'),
@@ -523,7 +546,7 @@ count_chart = alt.Chart(data).mark_bar().encode(
     width=600
 )
 
-# 2) Tasso di cancellazione
+# rate cancellation chart by deposit_type
 rate_chart = alt.Chart(data).transform_aggregate(
     cancel_rate='mean(is_canceled)', 
     groupby=['deposit_type']
@@ -538,6 +561,51 @@ rate_chart = alt.Chart(data).transform_aggregate(
     title='Tasso di Cancellazione per Tipo di Cauzione',
     width=600
 )
-
-st.subheader("Analisi di `deposit_type`")
 st.altair_chart(count_chart & rate_chart, use_container_width=True)
+
+"""
+Dai 2 grafici sembrerebbe non esserci un effetto significativo della cauzione sull'esito 
+della prenotazione, nonostante una piccola diminuzione del tasso di cancellaizione.
+Dal grafico si potrebbe concludere che utilizzare la caparra rimborsabile possa essere controproducente
+, bisogna però sottolineare la bassa frequenza di questo tipo di cauzione.
+
+## CONCLUSIONI:
+In questa analisi esplorativa abbiamo visto solo alcune delle variabili, nella seconda parte vedremo
+in maniera meno interpretativa quali sono le variabili utili per il nostro problema.
+
+### Risultati Principali
+L'analisi del dataset di prenotazioni hotel ha rivelato diversi pattern significativi
+che possono guidare strategie operative mirate:
+ Il Tasso di Cancellazione:
+
+37% delle prenotazioni viene cancellato, con differenze sostanziali tra tipologie di hotel
+City Hotel hanno un tasso di cancellazione più elevato rispetto ai Resort Hotel.
+La relazione tra prezzo e cancellazione varia inversamente nei due tipi di struttura
+
+I fattori Predittivi Chiave sembrerebbero essere:
+- Lead Time: Maggiore è il tempo tra prenotazione e arrivo, più alta è la probabilità di cancellazione
+- Il comportamento del Cliente:
+Clienti che effettuano modifiche alla prenotazione cancellano meno frequentemente
+Clienti con richieste speciali mostrano tassi di cancellazione inferiori
+Clienti abituali hanno una probabilità significativamente minore di cancellare
+
+- Storia delle Prenotazioni:
+Clienti con solo cancellazioni precedenti (tasso di cancellazione dell'84%)
+Clienti con prenotazioni passate completate (tasso di cancellazione del 14-19%)
+
+- Distribuzione Geografica
+Sembrerebbe esserci un'effetto prossimità: clienti portoghesi (locali) mostrano tassi di cancellazione più elevati
+
+
+Possibili strategie per la riduzione delle cancellazioni:
+
+Programmi di fidelizzazione mirati a clienti con storia positiva di soggiorni completati
+Incentivi per modifiche piuttosto che cancellazioni complete
+Monitoraggio comportamentale per identificare clienti ad alto rischio di cancellazione
+Strategie differenziate per clienti locali vs internazionali
+
+Considerazioni sui Depositi:
+L'analisi suggerisce che le cauzioni non hanno un impatto significativo sulla riduzione delle cancellazioni,
+rendendo questionabile questa strategia.
+
+"""

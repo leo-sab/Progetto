@@ -38,7 +38,9 @@ PROGETTO_SE2/
  Streamlit, Polars, Geopandas, Altair, Scipy, Joblib, Scikit-learn
 
 ## Informazioni sul dataset
-Il dataset si trova su Kaggle (https://www.kaggle.com/datasets/thedevastator/hotel-bookings-analysis) contiene le prenotazioni fatte per hotel portoghesi, ha circa 119 mila righe e 33 variabili.
+Il dataset si trova su Kaggle (https://www.kaggle.com/datasets/thedevastator/hotel-bookings-analysis) contiene le prenotazioni fatte per hotel portoghesi, ha circa 119 mila righe e 33 variabili. 
+Si assume che le prenotazioni presenti siano una buona rappresentazione delle prenotazioni fatte negli hotel e negli anni presi in analisi, ossia che non ci siano distorsioni (oltre all'errore campionario) dovute al campionamento.
+Inoltre si assume che le cancellazioni siano sempre causate dal cliente.
 
 | Variabile                        | Tipo         | Descrizione                                                                                                           |
 |------------------------------|--------------|----------------------------------------------------------------------------------------------------------------------|
@@ -94,6 +96,14 @@ Le operazioni effettuate sono:
     Creazione di una colonna arrival_date in formato Date: viene generata a partire dalle colonne arrival_date_year, arrival_date_month e arrival_date_day_of_month. 
 
  ## Scelta colori:
+ Per le variabili tipo di hotel e cancellazione si è scelto di rappresentarle sempre con lo stesso scheme.
+Per le variabili categoriali sono state scelte le seguenti palette: 
+cat_color = "category20" 
+cat_color1 = "set2"
+Per le variabili sequenziali:
+sequential_color = "viridis"
+Per le variabili sequenziali divergenti (2 direzioni):
+divergent_color = "redblue"
 
  ## Modello:
  Il modello utilizzato è un Random Forest Classifier.
