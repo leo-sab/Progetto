@@ -571,7 +571,7 @@ Dal grafico si potrebbe concludere che utilizzare la caparra rimborsabile possa 
 
 ## CONCLUSIONI:
 In questa analisi esplorativa abbiamo visto solo alcune delle variabili, nella seconda parte vedremo
-in maniera meno interpretativa quali sono le variabili utili per il nostro problema.
+in maniera meno interpretativa ma globale, quali sono le variabili utili (e quanto) per il nostro problema.
 
 ### Risultati Principali
 L'analisi del dataset di prenotazioni hotel ha rivelato diversi pattern significativi
