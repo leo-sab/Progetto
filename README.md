@@ -30,7 +30,6 @@ PROGETTO_SE2/
 
 ├── map.html                      # Mappa 
 
-│
 ├── home.py                       # Entry-point Streamlit dell’applicazione
 
 ├── app.py                        # Pagina EDA
