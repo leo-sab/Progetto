@@ -431,7 +431,7 @@ with col1:
         theta=alt.Theta("count()"),
         color=alt.Color(
             "is_canceled:N",
-            scale=alt.Scale(scheme = cat_color),
+            scale=alt.Scale(scheme = cat_color1),
             title="cancellazione"
         )
     ).properties(title = "Nuovo cliente") 
@@ -441,7 +441,7 @@ with col2:
         theta=alt.Theta("count()"),
         color=alt.Color(
             "is_canceled:N",
-            scale=alt.Scale(scheme = cat_color),
+            scale=alt.Scale(scheme = cat_color1),
             title="cancellazione"
         )
     ).properties(title = "Cliente abituale")  
