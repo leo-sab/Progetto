@@ -12,27 +12,47 @@ Con il commando:
 ## Struttura del progetto
 PROGETTO_SE2/
 │
-├── .gitignore                     
-├── .python-version                
-├── pyproject.toml                 
-├── uv.lock                        
+├── .gitignore            
+
+├── .python-version  
+
+├── pyproject.toml    
+
+├── uv.lock         
+
 │
+
 ├── hotel_bookings.csv            # Dataset principale usato per analisi e training
+
 ├── ne_10m_admin_0_countries.zip  # Dati per mappe
+
 ├── map.html                      # Mappa 
+
 │
 ├── home.py                       # Entry-point Streamlit dell’applicazione
+
 ├── app.py                        # Pagina EDA
+
 ├── app_model.py                  # Pagina Modello
+
 │
+
 ├── trainmodel.py                 # Script di training del modello 
+
 ├── preprocess.py                 # Funzioni utilizzate in app.py e preprocessing del dataset
+
 │
+
 ├── label_encoders_RF0.pkl        # Label encoder salvato per la trasformazione delle variabili categoriche
+
 ├── model_RF0_metrics.pkl         # Metriche salvate del modello 
+
 ├── random_forest_model_0.pkl     # Modello Random Forest 
+
 │
+
 ├── README.md                     
+
 └── __pycache__/                  
 
 ## Librerie utilizzate
