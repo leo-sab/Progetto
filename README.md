@@ -11,7 +11,9 @@ Con il commando:
 
 ## Struttura del progetto
 PROGETTO_SE2/
+
 │
+
 ├── .gitignore            
 
 ├── .python-version  
