@@ -3,7 +3,7 @@
 
 
 ## Obiettivo del progetto
-Creare una dashboard per visualizzare l'analisi esplorativa del dataset, per approfondire le variabili presenti e fare possibili ipotesi dei motivi della cancellazione e di politiche per la prevenzione.
+Creare una dashboard per visualizzare l'analisi esplorativa del dataset, per approfondire le variabili presenti e fare possibili ipotesi sui motivi della cancellazione e possibili politiche per la prevenzione.
 Creazione di un tool utilizzabile dai gestori di hotel per prevenire/prepararsi a possibili cancellazioni.
 ## Come avviare l'applicazione?
 Con il commando: 
