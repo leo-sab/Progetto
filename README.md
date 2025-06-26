@@ -1,6 +1,7 @@
 # Hotel Booking Cancellation
 
 
+
 ## Obiettivo del progetto
 Creare una dashboard per visualizzare l'analisi esplorativa del dataset, per approfondire le variabili presenti e fare possibili ipotesi dei motivi della cancellazione e di politiche per la prevenzione.
 Creazione di un tool utilizzabile dai gestori di hotel per prevenire/prepararsi a possibili cancellazioni.
@@ -108,6 +109,7 @@ divergent_color = "redblue"
  ## Modello:
  Il modello utilizzato è un Random Forest Classifier.
  Il target da predire è la variabile binaria is_canceled.
+ Nota il modello è stato salvato, visto il peso del file è stato utilizzato git LFS.
 
 Il preprocessing comprende:
 
@@ -122,6 +124,5 @@ Addestramento:
     Il dataset è diviso in training e test set con un rapporto 80/20.
     Il modello è addestrato con 100 alberi e random_state=42 per la riproducibilità.
     Viene eseguita una cross-validation stratificata a 5 fold per stimare le metriche medie: accuracy, precision, recall, f1-score e ROC AUC.
-
 
 Il modello, le metriche e la "mappatura" degli encoders sono salvati in file .pkl per velocizzare l'esecuzione dell'applicazione.
